@@ -2,11 +2,15 @@ package com.pinyougou.cart.controller;
 
 import com.alibaba.dubbo.config.annotation.Reference;
 import com.pinyougou.pay.service.WeixinPayService;
+import com.pinyougou.pojo.TbPayLog;
+import com.pinyougou.service.OrderService;
 import entity.Result;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import util.IdWorker;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -19,6 +23,8 @@ import java.util.Map;
 public class PayController {
     @Reference
     private WeixinPayService weixinPayService;
+    @Reference
+    private OrderService orderService;
 
     /**
      * 生成二维码
@@ -27,8 +33,20 @@ public class PayController {
 
     @RequestMapping("/createNative")
     public Map createNative(){
-        IdWorker idWorker=new IdWorker();
-        return weixinPayService.createNative(idWorker.nextId()+"","1");
+        //获取当前用户
+        String userId=SecurityContextHolder.getContext().getAuthentication().getName();
+        //到redis查询支付日志
+        TbPayLog payLog=orderService.searchPayLogFromRedis(userId);
+        //判断支付日志是否存在
+        if (payLog!=null){
+            return weixinPayService.createNative(payLog.getOutTradeNo(),payLog.getTotalFee()+"");
+        }else {
+            return new HashMap();
+        }
+
+        //IdWorker idWorker=new IdWorker();
+       // return weixinPayService.createNative(idWorker.nextId()+"","1");
+
 
     }
 
@@ -51,6 +69,8 @@ public class PayController {
             }
             if(map.get("trade_state").equals("SUCCESS")){//如果成功
                 result=new Result(true,"支付成功");
+                //修改订单状态
+                orderService.updateOrderStatus(out_trade_no,map.get("transation_id"));
                 break;
             }
             try {
