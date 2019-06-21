@@ -241,6 +241,8 @@ public class OrderServiceImpl implements OrderService {
 		return (TbPayLog) redisTemplate.boundHashOps("payLog").get(userId);
 	}
 
+
+
 	@Override
 	public void updateOrderStatus(String out_trade_no, String transaction_id) {
 		//修改支付日志状态
